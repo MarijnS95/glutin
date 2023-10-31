@@ -62,5 +62,5 @@ install [`cargo-apk`](https://crates.io/crates/cargo-apk)
 and start the app using:
 
 ```console
-$ cargo apk r -p glutin_examples --example android
+$ cargo apk r -p glutin_examples --example android_app
 ```
