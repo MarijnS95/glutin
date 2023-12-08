@@ -39,3 +39,6 @@ crate-type = ["cdylib"]
 [[example]]
 name = "egl_device"
 required-features = ["egl"]
+
+[package.metadata.android.sdk]
+target_sdk_version = 34

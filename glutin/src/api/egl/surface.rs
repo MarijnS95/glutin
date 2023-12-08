@@ -112,6 +112,33 @@ impl ColorSpace {
     }
 }
 
+/// <https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_surface_CTA861_3_metadata.txt>
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct CTA861_3Metadata {
+    // TODO: Support integer fractionals?
+    ///
+    pub max_content_light_level: f32,
+    ///
+    pub max_frame_average_level: f32,
+}
+
+/// <https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_surface_SMPTE2086_metadata.txt>
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct SMPTE2086Metadata {
+    ///
+    pub display_primary_r: [f32; 2],
+    ///
+    pub display_primary_g: [f32; 2],
+    ///
+    pub display_primary_b: [f32; 2],
+    ///
+    pub white_point: [f32; 2],
+    ///
+    pub min_luminance: f32,
+    ///
+    pub max_luminance: f32,
+}
+
 /// Attributes which are used for creating a particular surface in EGL.
 // TODO: Do we need a builder here?
 #[derive(Default, Debug, Clone)]
@@ -120,6 +147,11 @@ pub struct EglSurfaceAttributes<T: SurfaceTypeTrait> {
     pub attributes: SurfaceAttributes<T>,
     /// If [`None`], no [`egl::GL_COLORSPACE`] is selected.
     pub color_space: Option<ColorSpace>,
+
+    ///
+    pub cta861_3_metadata: Option<CTA861_3Metadata>,
+    ///
+    pub smpte2086_metadata: Option<SMPTE2086Metadata>,
 }
 
 impl<T: SurfaceTypeTrait> Deref for EglSurfaceAttributes<T> {
@@ -141,6 +173,8 @@ impl<T: SurfaceTypeTrait> From<SurfaceAttributes<T>> for EglSurfaceAttributes<T>
                 true => ColorSpace::Srgb,
             }),
             attributes,
+            cta861_3_metadata: None,
+            smpte2086_metadata: None,
         }
     }
 }
@@ -212,6 +246,82 @@ impl Display {
             let color_attr = color_space.egl_colorspace();
             attrs.push(egl::GL_COLORSPACE as EGLAttrib);
             attrs.push(color_attr as EGLAttrib);
+        }
+
+        fn prep_metadata(attrs: &mut Vec<EGLAttrib>, attrib: EGLenum, value: f32) {
+            attrs.push(attrib as EGLAttrib);
+            dbg!(value);
+            attrs.push((value * egl::METADATA_SCALING_EXT as f32) as EGLAttrib);
+        }
+
+        if let Some(cta861_3_metadata) = surface_attributes.cta861_3_metadata {
+            prep_metadata(
+                &mut attrs,
+                egl::CTA861_3_MAX_CONTENT_LIGHT_LEVEL_EXT,
+                cta861_3_metadata.max_content_light_level,
+            );
+            prep_metadata(
+                &mut attrs,
+                egl::CTA861_3_MAX_FRAME_AVERAGE_LEVEL_EXT,
+                cta861_3_metadata.max_frame_average_level,
+            );
+        }
+
+        if let Some(smpte2086_metadata) = surface_attributes.smpte2086_metadata {
+            prep_metadata(
+                &mut attrs,
+                egl::SMPTE2086_DISPLAY_PRIMARY_RX_EXT,
+                smpte2086_metadata.display_primary_r[0],
+            );
+            prep_metadata(
+                &mut attrs,
+                egl::SMPTE2086_DISPLAY_PRIMARY_RY_EXT,
+                smpte2086_metadata.display_primary_r[1],
+            );
+
+            prep_metadata(
+                &mut attrs,
+                egl::SMPTE2086_DISPLAY_PRIMARY_GX_EXT,
+                smpte2086_metadata.display_primary_g[0],
+            );
+            prep_metadata(
+                &mut attrs,
+                egl::SMPTE2086_DISPLAY_PRIMARY_GY_EXT,
+                smpte2086_metadata.display_primary_g[1],
+            );
+
+            prep_metadata(
+                &mut attrs,
+                egl::SMPTE2086_DISPLAY_PRIMARY_BX_EXT,
+                smpte2086_metadata.display_primary_b[0],
+            );
+            prep_metadata(
+                &mut attrs,
+                egl::SMPTE2086_DISPLAY_PRIMARY_BY_EXT,
+                smpte2086_metadata.display_primary_b[1],
+            );
+
+            prep_metadata(
+                &mut attrs,
+                egl::SMPTE2086_WHITE_POINT_X_EXT,
+                smpte2086_metadata.white_point[0],
+            );
+            prep_metadata(
+                &mut attrs,
+                egl::SMPTE2086_WHITE_POINT_Y_EXT,
+                smpte2086_metadata.white_point[1],
+            );
+
+            prep_metadata(
+                &mut attrs,
+                egl::SMPTE2086_MIN_LUMINANCE_EXT,
+                smpte2086_metadata.min_luminance,
+            );
+            prep_metadata(
+                &mut attrs,
+                egl::SMPTE2086_MAX_LUMINANCE_EXT,
+                smpte2086_metadata.max_luminance,
+            );
         }
 
         // Push `egl::NONE` to terminate the list.
@@ -457,6 +567,60 @@ impl<T: SurfaceTypeTrait> Surface<T> {
         }
         let color_space = unsafe { self.raw_attribute(egl::GL_COLORSPACE as EGLint) };
         ColorSpace::from_egl_colorspace(color_space as EGLenum)
+    }
+
+    fn parse_metadata_value(&self, attr: EGLenum) -> f32 {
+        let value = unsafe { self.raw_attribute(attr as EGLint) };
+
+        if value == egl::DONT_CARE {
+            // todo!("{attr:#x}: {value:x}");
+            return f32::NAN;
+        }
+
+        value as f32 / egl::METADATA_SCALING_EXT as f32
+    }
+
+    /// Returns the [`CTA861_3Metadata`] of the [`Surface`], or [`None`] if
+    /// `EGL_EXT_surface_CTA861_3_metadata` is not supported.
+    pub fn cta861_3_metadata(&self) -> Option<CTA861_3Metadata> {
+        if !self.display.inner.display_extensions.contains("EGL_EXT_surface_CTA861_3_metadata") {
+            return None;
+        }
+        let max_content_light_level =
+            self.parse_metadata_value(egl::CTA861_3_MAX_CONTENT_LIGHT_LEVEL_EXT);
+        let max_frame_average_level =
+            self.parse_metadata_value(egl::CTA861_3_MAX_FRAME_AVERAGE_LEVEL_EXT);
+
+        Some(CTA861_3Metadata { max_content_light_level, max_frame_average_level })
+    }
+
+    /// Returns the [`CTA861_3Metadata`] of the [`Surface`], or [`None`] if
+    /// `EGL_EXT_surface_CTA861_3_metadata` is not supported.
+    pub fn smpte2086_metadata(&self) -> Option<SMPTE2086Metadata> {
+        if !self.display.inner.display_extensions.contains("EGL_EXT_surface_CTA861_3_metadata") {
+            return None;
+        }
+
+        Some(SMPTE2086Metadata {
+            display_primary_r: [
+                self.parse_metadata_value(egl::SMPTE2086_DISPLAY_PRIMARY_RX_EXT),
+                self.parse_metadata_value(egl::SMPTE2086_DISPLAY_PRIMARY_RY_EXT),
+            ],
+            display_primary_g: [
+                self.parse_metadata_value(egl::SMPTE2086_DISPLAY_PRIMARY_GX_EXT),
+                self.parse_metadata_value(egl::SMPTE2086_DISPLAY_PRIMARY_GY_EXT),
+            ],
+            display_primary_b: [
+                self.parse_metadata_value(egl::SMPTE2086_DISPLAY_PRIMARY_BX_EXT),
+                self.parse_metadata_value(egl::SMPTE2086_DISPLAY_PRIMARY_BY_EXT),
+            ],
+            white_point: [
+                self.parse_metadata_value(egl::SMPTE2086_WHITE_POINT_X_EXT),
+                self.parse_metadata_value(egl::SMPTE2086_WHITE_POINT_Y_EXT),
+            ],
+            min_luminance: self.parse_metadata_value(egl::SMPTE2086_MIN_LUMINANCE_EXT),
+            max_luminance: self.parse_metadata_value(egl::SMPTE2086_MAX_LUMINANCE_EXT),
+        })
     }
 }
 

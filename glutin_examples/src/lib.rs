@@ -170,15 +170,25 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                     ]
                     .into_iter()
                     .find_map(|color_space| {
+                        dbg!(color_space);
                         // Skip color spaces for which the extension is not available, to prevent
                         // receiving EGL_BAD_ATTRIBUTE
                         if let Some(color_space) = color_space {
                             if !exts.contains(color_space.egl_extension_name()) {
+                                dbg!(color_space);
                                 return None;
                             }
                         }
-                        let egl_attrs =
-                            EglSurfaceAttributes { attributes: attrs.clone(), color_space };
+                        let egl_attrs = EglSurfaceAttributes {
+                            attributes: attrs.clone(),
+                            color_space,
+                            // cta861_3_metadata: None,
+                            cta861_3_metadata: Some(glutin::api::egl::surface::CTA861_3Metadata {
+                                max_content_light_level: 80f32,
+                                max_frame_average_level: 40f32,
+                            }),
+                            smpte2086_metadata: None,
+                        };
                         // TODO: Careful here that it uses the EGL function, or deref will pass
                         // non-EGL surface attributes to the non-EGL trait function!
                         // Should we use a different name and/or remove deref?
@@ -187,11 +197,20 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                                 eprintln!("Color space {color_space:?} not supported: {e:?}");
                                 None
                             },
-                            Ok(s) => Some(s),
+                            Ok(s) => {
+                                // dbg!(s.color_space());
+                                if s.color_space() != color_space {
+                                eprintln!("Surface created but surface color space {:?} does not match requested {color_space:?}", s.color_space());
+                                    return None;
+                                }
+                                Some(s)
+                            },
                         }
                     })
                     .expect("Could not create surface");
                     println!("Picked surface with color space {:?}", s.color_space());
+                    dbg!(s.cta861_3_metadata());
+                    dbg!(s.smpte2086_metadata());
                     glutin::surface::Surface::Egl(s)
                 } else {
                     unsafe { gl_display.create_window_surface(&gl_config, &attrs) }.unwrap()
