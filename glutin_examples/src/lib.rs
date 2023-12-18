@@ -4,7 +4,8 @@ use std::num::NonZeroU32;
 use std::ops::Deref;
 
 use raw_window_handle::HasRawWindowHandle;
-use winit::event::{Event, WindowEvent};
+use winit::event::{Event, KeyEvent, WindowEvent};
+use winit::keyboard::{Key, NamedKey};
 use winit::window::WindowBuilder;
 
 use glutin::config::ConfigTemplateBuilder;
@@ -165,7 +166,11 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                         }
                     }
                 },
-                WindowEvent::CloseRequested => window_target.exit(),
+                WindowEvent::CloseRequested
+                | WindowEvent::KeyboardInput {
+                    event: KeyEvent { logical_key: Key::Named(NamedKey::Escape), .. },
+                    ..
+                } => window_target.exit(),
                 _ => (),
             },
             Event::AboutToWait => {
