@@ -242,6 +242,14 @@ impl Display {
             attrs.push(1);
         }
 
+        // TODO: Need WGL template
+        let srgb = true;
+        attrs.push(wgl_extra::COLORSPACE_EXT as _);
+        attrs.push(match srgb {
+            true => wgl_extra::COLORSPACE_SRGB_EXT,
+            false => wgl_extra::COLORSPACE_LINEAR_EXT,
+        } as _);
+
         // Terminate attrs with zero.
         attrs.push(0);
 
@@ -263,6 +271,18 @@ impl Display {
             configs.set_len(num_configs as _);
 
             Ok(Box::new(configs.into_iter().map(move |pixel_format_index| {
+                let mut cs = 0;
+                let res = wgl_extra.GetPixelFormatAttribivARB(
+                    hdc as *const _,
+                    pixel_format_index,
+                    gl::PFD_MAIN_PLANE as _,
+                    1,
+                    &(wgl_extra::COLORSPACE_EXT as _),
+                    &mut cs,
+                );
+
+                dbg!(res, cs);
+
                 let inner = Arc::new(ConfigInner {
                     display: self.clone(),
                     hdc,

@@ -7,11 +7,11 @@ use raw_window_handle::HasRawWindowHandle;
 use winit::event::{Event, WindowEvent};
 use winit::window::WindowBuilder;
 
-use glutin::config::ConfigTemplateBuilder;
+use glutin::config::{ColorBufferType, ConfigTemplateBuilder};
 use glutin::context::{ContextApi, ContextAttributesBuilder, Version};
 use glutin::display::GetGlDisplay;
 use glutin::prelude::*;
-use glutin::surface::SwapInterval;
+use glutin::surface::{SurfaceAttributes, SwapInterval};
 
 use glutin_winit::{self, DisplayBuilder, GlWindow};
 
@@ -19,7 +19,7 @@ pub mod gl {
     #![allow(clippy::all)]
     include!(concat!(env!("OUT_DIR"), "/gl_bindings.rs"));
 
-    pub use Gles2 as Gl;
+    // pub use Gles2 as Gl;
 }
 
 pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn Error>> {
@@ -39,16 +39,23 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
     // that, because we can query only one config at a time on it, but all
     // normal platforms will return multiple configs, so we can find the config
     // with transparency ourselves inside the `reduce`.
-    let template =
-        ConfigTemplateBuilder::new().with_alpha_size(8).with_transparency(cfg!(cgl_backend));
+    let template = ConfigTemplateBuilder::new()
+        // `0` means "no preference"
+        .with_buffer_type(ColorBufferType::Rgb { r_size: 0, g_size: 0, b_size: 0 })
+        .with_alpha_size(0)
+        .with_float_pixels(true)
+        .with_transparency(cfg!(cgl_backend));
 
-    let display_builder = DisplayBuilder::new().with_window_builder(window_builder);
+    let display_builder = DisplayBuilder::new()
+        .with_window_builder(window_builder)
+        .with_preference(glutin_winit::ApiPreference::PreferEgl);
 
     let (mut window, gl_config) = display_builder.build(&event_loop, template, |configs| {
         // Find the config with the maximum number of samples, so our triangle will
         // be smooth.
         configs
             .reduce(|accum, config| {
+                dbg!(config.srgb_capable());
                 let transparency_check = config.supports_transparency().unwrap_or(false)
                     & !accum.supports_transparency().unwrap_or(false);
 
@@ -62,6 +69,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
     })?;
 
     println!("Picked a config with {} samples", gl_config.num_samples());
+    dbg!(gl_config.srgb_capable());
 
     let raw_window_handle = window.as_ref().map(|window| window.raw_window_handle());
 
@@ -72,7 +80,9 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
     // The context creation part. It can be created before surface and that's how
     // it's expected in multithreaded + multiwindow operation mode, since you
     // can send NotCurrentContext, but not Surface.
-    let context_attributes = ContextAttributesBuilder::new().build(raw_window_handle);
+    let context_attributes = ContextAttributesBuilder::new()
+        .with_context_api(ContextApi::OpenGl(Some(Version::new(4, 6))))
+        .build(raw_window_handle);
 
     // Since glutin by default tries to create OpenGL core context, which may not be
     // present we should try gles.
@@ -112,7 +122,7 @@ pub fn main(event_loop: winit::event_loop::EventLoop<()>) -> Result<(), Box<dyn 
                         .unwrap()
                 });
 
-                let attrs = window.build_surface_attributes(<_>::default());
+                let attrs = window.build_surface_attributes(Default::default());
                 let gl_surface = unsafe {
                     gl_config.display().create_window_surface(&gl_config, &attrs).unwrap()
                 };
@@ -208,6 +218,22 @@ impl Renderer {
 
             if let Some(shaders_version) = get_gl_string(&gl, gl::SHADING_LANGUAGE_VERSION) {
                 println!("Shaders version on {}", shaders_version.to_string_lossy());
+            }
+
+            gl.Enable(gl::FRAMEBUFFER_SRGB);
+            dbg!(gl.IsEnabled(gl::FRAMEBUFFER_SRGB));
+            let mut color_encoding = 0;
+            gl.GetFramebufferAttachmentParameteriv(
+                gl::FRAMEBUFFER,
+                gl::FRONT,
+                gl::FRAMEBUFFER_ATTACHMENT_COLOR_ENCODING,
+                &mut color_encoding,
+            );
+            dbg!(gl.GetError());
+            match dbg!(color_encoding) as _ {
+                gl::SRGB => println!("srgb"),
+                gl::LINEAR => println!("linear"),
+                x => println!("???? {x:x}"),
             }
 
             let vertex_shader = create_shader(&gl, gl::VERTEX_SHADER, VERTEX_SHADER_SOURCE);

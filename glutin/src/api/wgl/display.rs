@@ -68,6 +68,8 @@ impl Display {
                 (None, HashSet::new())
             };
 
+        dbg!(&client_extensions);
+
         let features = Self::extract_display_features(&client_extensions);
 
         let inner = Arc::new(DisplayInner { lib_opengl32, wgl_extra, features, client_extensions });
