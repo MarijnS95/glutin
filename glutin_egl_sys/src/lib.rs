@@ -27,11 +27,6 @@ pub mod egl {
     include!(concat!(env!("OUT_DIR"), "/egl_bindings.rs"));
 
     // TODO should upstream these:
-    // EGL_EXT_platform_xcb
-    pub const PLATFORM_XCB_EXT: super::EGLenum = 0x31DC;
-    pub const PLATFORM_XCB_SCREEN_EXT: super::EGLenum = 0x31DE;
-    // EGL_EXT_device_query_name
-    pub const RENDERER_EXT: super::EGLenum = 0x335F;
     // EGL_ANGLE_platform_angle - https://chromium.googlesource.com/angle/angle/+/HEAD/extensions/EGL_ANGLE_platform_angle.txt
     pub const PLATFORM_ANGLE_ANGLE: super::EGLenum = 0x3202;
     pub const PLATFORM_ANGLE_TYPE_ANGLE: super::EGLenum = 0x3203;
