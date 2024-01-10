@@ -9,3 +9,7 @@ members = [
     "glutin_wgl_sys",
     "glutin_gles2_sys",
 ]
+
+[patch.crates-io]
+# https://github.com/brendanzab/gl-rs/pull/546
+gl_generator = { git = "https://github.com/MarijnS95/gl-rs", rev = "f182e43" }
