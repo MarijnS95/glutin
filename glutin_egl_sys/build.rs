@@ -42,6 +42,7 @@ fn main() {
             "EGL_EXT_platform_device",
             "EGL_EXT_platform_wayland",
             "EGL_EXT_platform_x11",
+            "EGL_EXT_platform_xcb",
             "EGL_EXT_swap_buffers_with_damage",
             "EGL_KHR_create_context",
             "EGL_KHR_create_context_no_error",
