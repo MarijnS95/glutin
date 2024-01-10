@@ -32,11 +32,6 @@ use super::display::Display;
 /// Hint for the attribute list size.
 const ATTR_SIZE_HINT: usize = 8;
 
-/// Missing `EGL_EXT_gl_colorspace_bt2020_hlg` constant defined at <https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_bt2020_linear.txt>
-pub const EGL_GL_COLORSPACE_BT2020_HLG_EXT: EGLenum = 0x3540;
-/// Missing `EXT_gl_colorspace_display_p3_passthrough` constant defined at <https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_display_p3_passthrough.txt>
-pub const EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT: EGLenum = 0x3490;
-
 /// Possible color spaces for [`egl::GL_COLORSPACE`].
 ///
 /// It is impossible to query whether a [`Config`] or [`Surface`] supports a
@@ -58,9 +53,9 @@ pub enum ColorSpace {
     DisplayP3,
     /// Use [`egl::GL_COLORSPACE_DISPLAY_P3_LINEAR_EXT`] from [`EGL_EXT_gl_colorspace_display_p3_linear`](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_display_p3.txt).
     DisplayP3Linear,
-    /// Use [`EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT`] from [`EGL_EXT_gl_colorspace_display_p3_passthrough`](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_display_p3_passthrough.txt).
+    /// Use [`egl::GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT`] from [`EGL_EXT_gl_colorspace_display_p3_passthrough`](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_display_p3_passthrough.txt).
     DisplayP3Passthrough,
-    /// Use [`EGL_GL_COLORSPACE_BT2020_HLG_EXT`] from [`EGL_EXT_gl_colorspace_bt2020_hlg`](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_bt2020_linear.txt).
+    /// Use [`egl::GL_COLORSPACE_BT2020_HLG_EXT`] from [`EGL_EXT_gl_colorspace_bt2020_hlg`](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_bt2020_linear.txt).
     Bt2020Hlg,
     /// Use [`egl::GL_COLORSPACE_BT2020_LINEAR_EXT`] from [`EGL_EXT_gl_colorspace_bt2020_linear`](https://registry.khronos.org/EGL/extensions/EXT/EGL_EXT_gl_colorspace_bt2020_linear.txt).
     Bt2020Linear,
@@ -77,8 +72,8 @@ impl ColorSpace {
             ColorSpace::ScrgbLinear => egl::GL_COLORSPACE_SCRGB_LINEAR_EXT,
             ColorSpace::DisplayP3 => egl::GL_COLORSPACE_DISPLAY_P3_EXT,
             ColorSpace::DisplayP3Linear => egl::GL_COLORSPACE_DISPLAY_P3_LINEAR_EXT,
-            ColorSpace::DisplayP3Passthrough => EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT,
-            ColorSpace::Bt2020Hlg => EGL_GL_COLORSPACE_BT2020_HLG_EXT,
+            ColorSpace::DisplayP3Passthrough => egl::GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT,
+            ColorSpace::Bt2020Hlg => egl::GL_COLORSPACE_BT2020_HLG_EXT,
             ColorSpace::Bt2020Linear => egl::GL_COLORSPACE_BT2020_LINEAR_EXT,
             ColorSpace::Bt2020Pq => egl::GL_COLORSPACE_BT2020_PQ_EXT,
         }
@@ -92,8 +87,8 @@ impl ColorSpace {
             egl::GL_COLORSPACE_SCRGB_LINEAR_EXT => Self::ScrgbLinear,
             egl::GL_COLORSPACE_DISPLAY_P3_EXT => Self::DisplayP3,
             egl::GL_COLORSPACE_DISPLAY_P3_LINEAR_EXT => Self::DisplayP3Linear,
-            EGL_GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT => Self::DisplayP3Passthrough,
-            EGL_GL_COLORSPACE_BT2020_HLG_EXT => Self::Bt2020Hlg,
+            egl::GL_COLORSPACE_DISPLAY_P3_PASSTHROUGH_EXT => Self::DisplayP3Passthrough,
+            egl::GL_COLORSPACE_BT2020_HLG_EXT => Self::Bt2020Hlg,
             egl::GL_COLORSPACE_BT2020_LINEAR_EXT => Self::Bt2020Linear,
             egl::GL_COLORSPACE_BT2020_PQ_EXT => Self::Bt2020Pq,
             _ => return None,
