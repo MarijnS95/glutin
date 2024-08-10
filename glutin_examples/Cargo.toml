@@ -19,12 +19,15 @@ x11 = ["glutin-winit/x11"]
 wayland = ["glutin-winit/wayland", "winit/wayland-dlopen", "winit/wayland-csd-adwaita"]
 
 [dependencies]
+anyhow = "1"
 glutin = { path = "../glutin", default-features = false }
 glutin-winit = { path = "../glutin-winit", default-features = false }
 png = { version = "0.17.6", optional = true }
 raw-window-handle = "0.6"
 winit = { version = "0.30.0", default-features = false, features = ["rwh_06"] }
 drm = { version = "0.12", optional = true }
+gbm = { version = "0.15", optional = true }
+libc = "0.2"
 
 [target.'cfg(target_os = "android")'.dependencies]
 winit = { version = "0.30.0", default-features = false, features = ["android-native-activity", "rwh_06"] }
@@ -44,3 +47,7 @@ required-features = ["egl"]
 [[example]]
 name = "drm"
 required-features = ["egl", "drm"]
+
+[[example]]
+name = "gbm"
+required-features = ["drm", "egl", "gbm"]

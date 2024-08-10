@@ -55,7 +55,8 @@ impl Display {
             None => return Err(ErrorKind::NotFound.into()),
         };
 
-        CLIENT_EXTENSIONS.get_or_init(|| get_extensions(egl, egl::NO_DISPLAY));
+        let c = CLIENT_EXTENSIONS.get_or_init(|| get_extensions(egl, egl::NO_DISPLAY));
+        dbg!(c);
 
         // Create a EGL display by chaining all display creation functions aborting on
         // `EGL_BAD_ATTRIBUTE`.
