@@ -603,6 +603,7 @@ pub(crate) struct DisplayInner {
 
 impl DisplayInner {
     fn uses_display_reference(&self) -> bool {
+        dbg!(&self.display_extensions, CLIENT_EXTENSIONS.get());
         if !CLIENT_EXTENSIONS.get().unwrap().contains("EGL_KHR_display_reference") {
             return false;
         }
@@ -612,7 +613,7 @@ impl DisplayInner {
         // terminate the display without worry for the instance being
         // reused elsewhere.
         let mut track_references = MaybeUninit::<EGLAttrib>::uninit();
-        (match self.raw {
+        if match self.raw {
             EglDisplay::Khr(khr) => unsafe {
                 self.egl.QueryDisplayAttribKHR(
                     khr,
@@ -628,7 +629,17 @@ impl DisplayInner {
                 )
             },
             EglDisplay::Legacy(_) => egl::FALSE,
-        } == egl::TRUE)
+        } == egl::FALSE
+        {
+            // return Err(super::check_error().err().unwrap_or_else(|| {
+            //     ErrorKind::NotSupported("failed to query TRACK_REFERENCES from display").into()
+            // }));
+            return false;
+        }
+
+        let x = unsafe { track_references.assume_init() };
+        dbg!(x);
+        x == egl::TRUE as EGLAttrib
     }
 }
 

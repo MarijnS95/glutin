@@ -34,7 +34,12 @@ mod example {
         // Create a display using the device.
         let display =
             unsafe { Display::with_device(device, None) }.expect("Failed to create display");
-
+        dbg!(display.device());
+        {
+            let display =
+                unsafe { Display::with_device(device, None) }.expect("Failed to create display");
+            drop(display);
+        }
         let template = config_template();
         let config = unsafe { display.find_configs(template) }
             .unwrap()
