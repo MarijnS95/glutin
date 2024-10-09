@@ -33,11 +33,8 @@ pub mod surface;
 // library, note that public API functions currently retirm `&'static str`ings
 // out of it, which would become invalid.
 pub(crate) static EGL: Lazy<Option<Egl>> = Lazy::new(|| {
-    #[cfg(windows)]
-    let paths = ["libEGL.dll", "atioglxx.dll"];
-
-    #[cfg(not(windows))]
-    let paths = ["libEGL.so.1", "libEGL.so"];
+    let paths =
+        if cfg!(windows) { ["libEGL.dll", "atioglxx.dll"] } else { ["libEGL.so.1", "libEGL.so"] };
 
     unsafe { SymWrapper::new(&paths).map(Egl).ok() }
 });

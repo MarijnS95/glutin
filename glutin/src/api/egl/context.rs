@@ -134,11 +134,9 @@ impl Display {
             // it's supported.
             //
             // https://github.com/googlevr/gvr-android-sdk/issues/330
-            #[cfg(android_platform)]
-            let android = extensions.contains("EGL_ANDROID_front_buffer_auto_refresh")
+            let android = cfg!(android_platform)
+                && extensions.contains("EGL_ANDROID_front_buffer_auto_refresh")
                 && extensions.contains("EGL_ANDROID_create_native_client_buffer");
-            #[cfg(not(android_platform))]
-            let android = false;
 
             extensions.contains("EGL_IMG_context_priority") || android
         }) {

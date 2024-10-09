@@ -334,7 +334,6 @@ impl GlConfig for Config {
             | raw_window_handle::RawDisplayHandle::Xcb(_) => {
                 self.x11_visual().map(|visual| visual.supports_transparency())
             },
-            #[cfg(wayland_platform)]
             raw_window_handle::RawDisplayHandle::Wayland(_) => Some(self.alpha_size() != 0),
             _ => None,
         }
