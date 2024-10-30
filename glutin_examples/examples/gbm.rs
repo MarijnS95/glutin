@@ -12,7 +12,7 @@ use gbm::{AsRaw as _, BufferObjectFlags, Device, Format};
 use glutin::api::egl;
 use glutin::config::{ConfigSurfaceTypes, ConfigTemplateBuilder};
 use glutin::context::{ContextAttributesBuilder, NotCurrentGlContext, PossiblyCurrentGlContext};
-use glutin::display::GlDisplay as _;
+use glutin::prelude::GlDisplay;
 use glutin::surface::{GlSurface as _, SurfaceAttributesBuilder, WindowSurface};
 use glutin_examples::Renderer;
 use raw_window_handle::{GbmDisplayHandle, GbmWindowHandle, RawDisplayHandle, RawWindowHandle};
@@ -25,6 +25,9 @@ impl AsFd for DrmDevice {
         self.0.as_fd()
     }
 }
+
+// TODO: Replace with std::env::args() parsing?
+const USE_SURFACE: bool = true;
 
 fn main() -> Result<()> {
     let drm_files = std::fs::read_dir("/dev/dri/").context("Read /dev/dri/")?;
@@ -43,6 +46,19 @@ fn main() -> Result<()> {
         dbg!(fd.get_driver()?);
         let drm_gbm = Device::new(fd).context("Create GBM device")?;
         dbg!(drm_gbm.backend_name());
+
+        // TODO: It doesn't matter which method we use since we checked that this is our
+        // GBM device, but theoretically reading the drm_device_file() requires
+        // the EGL_EXT_device_drm extension to be present which is not necessary
+        // if just doing GBM.
+
+        let egl_display = unsafe {
+            egl::display::Display::new(RawDisplayHandle::Gbm(GbmDisplayHandle::new(
+                NonNull::new(drm_gbm.as_raw().cast_mut().cast()).context("Null GBM device")?,
+            )))
+        }
+        .context("Create EGL Display")?;
+        dbg!(&egl_display);
 
         // ----------- START ---------
         let rsc = drm_gbm.resource_handles().context("resource_handles")?;
@@ -67,92 +83,107 @@ fn main() -> Result<()> {
         let (width, height) = (width as u32, height as u32);
         // --------- TEMP END ------------
 
-        let bo = drm_gbm
-            .create_buffer_object::<()>(
-                width,
-                height,
-                Format::Xrgb8888,
-                // Fails here with EINVAL:
-                // | BufferObjectFlags::WRITE
-                BufferObjectFlags::SCANOUT | BufferObjectFlags::RENDERING,
-            )
-            .context("create_buffer_object")?;
-        dbg!(bo);
-        let surf = drm_gbm
-            .create_surface::<()>(
-                width,
-                height,
-                Format::Xrgb8888,
-                BufferObjectFlags::SCANOUT | BufferObjectFlags::RENDERING,
-            )
-            .context("create_surface")?;
-        dbg!(&surf);
-
-        // TODO: It doesn't matter which method we use since we checked that this is our
-        // GBM device, but theoretically reading the drm_device_file() requires
-        // the EGL_EXT_device_drm extension to be present which is not necessary
-        // if just doing GBM.
-
-        let egl_display = unsafe {
-            egl::display::Display::new(RawDisplayHandle::Gbm(GbmDisplayHandle::new(
-                NonNull::new(drm_gbm.as_raw().cast_mut().cast()).context("Null GBM device")?,
-            )))
-        }
-        .context("Create EGL Display")?;
-        dbg!(&egl_display);
-
         let config = unsafe {
             egl_display.find_configs(
                 ConfigTemplateBuilder::new()
-                    // .with_alpha_size(8)
-                    // .with_depth_size(0)
-                    // .with_buffer_type(glutin::config::ColorBufferType::Rgb {
-                    //     r_size: 8,
-                    //     g_size: 8,
-                    //     b_size: 8,
-                    // })
-                    .with_surface_type(ConfigSurfaceTypes::WINDOW)
+                    // .with_alpha_size(0)
+                    .with_surface_type(if USE_SURFACE {
+                        ConfigSurfaceTypes::WINDOW
+                    } else {
+                        // TODO: Unknown what config to pick when using GL_OES_image to bind an
+                        // EGLImage as texture or renderbuffer to a framebuffer.
+                        ConfigSurfaceTypes::empty()
+                    })
                     .build(),
             )
         }?
-            .next()
-        // .filter(|c| true)
-        // .next()
-        .unwrap();
+        .next()
+        .context("Find config")?;
         dbg!(&config);
-
-        let surface = unsafe {
-            egl_display.create_window_surface(
-                &config,
-                &SurfaceAttributesBuilder::<WindowSurface>::new().build(
-                    RawWindowHandle::Gbm(GbmWindowHandle::new(
-                        NonNull::new(surf.as_raw().cast_mut().cast()).unwrap(),
-                    )),
-                    NonZero::new_unchecked(width),
-                    NonZero::new_unchecked(height),
-                ),
-            )
-        }?;
-
-        dbg!(&surface);
 
         let context = unsafe {
             egl_display.create_context(&config, &ContextAttributesBuilder::new().build(None))
         }?;
         dbg!(&context);
 
-        let context = context.make_current(&surface)?;
+        enum RenderTarget {
+            Surface { surface: gbm::Surface<()>, egl_surface: egl::surface::Surface<WindowSurface> },
+            Image { bo: gbm::BufferObject<()>, image: egl::image::Image },
+        }
+
+        // TODO: There's a third method: importing an existing EGLImage into a gbm_bo
+        let (context, target) = if USE_SURFACE {
+            let surface = drm_gbm
+                .create_surface::<()>(
+                    width,
+                    height,
+                    Format::Xrgb8888,
+                    BufferObjectFlags::SCANOUT | BufferObjectFlags::RENDERING,
+                )
+                .context("create_surface")?;
+            dbg!(&surface);
+
+            let egl_surface = unsafe {
+                egl_display.create_window_surface(
+                    &config,
+                    &SurfaceAttributesBuilder::<WindowSurface>::new().build(
+                        RawWindowHandle::Gbm(GbmWindowHandle::new(
+                            NonNull::new(surface.as_raw().cast_mut().cast()).unwrap(),
+                        )),
+                        NonZero::new_unchecked(width),
+                        NonZero::new_unchecked(height),
+                    ),
+                )
+            }
+            .context("create_window_surface")?;
+
+            dbg!(&egl_surface);
+
+            let context = context.make_current(&egl_surface)?;
+
+            (context, RenderTarget::Surface { surface, egl_surface })
+        } else {
+            let bo = drm_gbm
+                .create_buffer_object::<()>(
+                    width,
+                    height,
+                    Format::Xrgb8888,
+                    BufferObjectFlags::SCANOUT | BufferObjectFlags::RENDERING,
+                )
+                .context("create_buffer_object")?;
+            dbg!(&bo);
+
+            let image = unsafe {
+                egl_display.create_image(
+                    egl::image::ImageBuffer::NativePixmap { buffer: bo.as_raw().cast() },
+                    true,
+                )
+            }
+            .unwrap();
+            dbg!(&image);
+
+            let context = context.make_current_surfaceless()?;
+
+            (context, RenderTarget::Image { bo, image })
+        };
 
         let renderer = Renderer::new(&egl_display);
+        if let RenderTarget::Image { bo: _, image } = &target {
+            unsafe { renderer.set_framebuffer(image.as_raw()) };
+        }
         renderer.resize(width as i32, height as i32);
 
         renderer.draw();
         unsafe { renderer.Finish() };
-        assert!(surf.has_free_buffers());
-        assert!(unsafe { surf.lock_front_buffer() }.is_err());
-        surface.swap_buffers(&context).context("swap_buffers")?;
-        assert!(surf.has_free_buffers());
-        let front_buffer = unsafe { surf.lock_front_buffer() }.context("lock_front_buffer")?;
+        let front_buffer = match &target {
+            RenderTarget::Surface { surface, egl_surface } => {
+                assert!(surface.has_free_buffers());
+                assert!(unsafe { surface.lock_front_buffer() }.is_err());
+                egl_surface.swap_buffers(&context).context("swap_buffers")?;
+                &unsafe { surface.lock_front_buffer() }.context("lock_front_buffer")?
+            },
+            RenderTarget::Image { bo, image: _ } => bo,
+        };
         dbg!(&front_buffer);
         // TODO: Signal a completion fence!
         let _context = context.make_not_current()?;
@@ -162,7 +193,7 @@ fn main() -> Result<()> {
         // which presents it via DRM.
 
         // TODO: Move
-        let fb = drm_gbm.add_framebuffer(&front_buffer, 24, 32).context("add_framebuffer")?;
+        let fb = drm_gbm.add_framebuffer(front_buffer, 24, 32).context("add_framebuffer")?;
         dbg!(fb);
 
         // drm_gbm.acquire_master_lock()?;
@@ -178,8 +209,8 @@ fn main() -> Result<()> {
         // TODO: Throw this into an atexit/signal handler.
         // Quickly going to graphics and back to text makes sure the console works again
         // after having temporarily taken over
-        const KDSETMODE: u64 = 0x4B3A;;
-        const KDGETMODE: u64 = 0x4B3B;;
+        const KDSETMODE: u64 = 0x4B3A;
+        // const KDGETMODE: u64 = 0x4B3B;
         const KD_TEXT: i32 = 0x00;
         const KD_GRAPHICS: i32 = 0x01;
         unsafe {

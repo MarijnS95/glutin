@@ -317,6 +317,10 @@ impl Renderer {
                 println!("Shaders version on {}", shaders_version.to_string_lossy());
             }
 
+            if let Some(extensions) = dbg!(get_gl_string(&gl, gl::EXTENSIONS)) {
+                println!("Extensions: {}", extensions.to_string_lossy());
+            }
+
             let vertex_shader = create_shader(&gl, gl::VERTEX_SHADER, VERTEX_SHADER_SOURCE);
             let fragment_shader = create_shader(&gl, gl::FRAGMENT_SHADER, FRAGMENT_SHADER_SOURCE);
 
@@ -369,6 +373,54 @@ impl Renderer {
 
             Self { program, vao, vbo, gl }
         }
+    }
+
+    pub unsafe fn set_framebuffer(&self, image: gl::types::GLeglImageOES) {
+        dbg!(unsafe { self.gl.GetError() });
+        let mut fb = 0;
+        unsafe { self.gl.GenFramebuffers(1, &mut fb) };
+        dbg!(unsafe { self.gl.GetError() });
+        unsafe { self.gl.BindFramebuffer(gl::FRAMEBUFFER, fb) };
+        dbg!(unsafe { self.gl.GetError() });
+        if false {
+            let mut tex = 0;
+            unsafe { self.gl.GenTextures(1, &mut tex) };
+            dbg!(unsafe { self.gl.GetError() });
+            unsafe { self.gl.BindTexture(gl::TEXTURE_2D, tex) };
+            dbg!(unsafe { self.gl.GetError() });
+            unsafe { self.gl.EGLImageTargetTexture2DOES(gl::TEXTURE_2D, image) };
+            dbg!(unsafe { self.gl.GetError() });
+            unsafe {
+                self.gl.FramebufferTexture2D(
+                    gl::FRAMEBUFFER,
+                    gl::COLOR_ATTACHMENT0,
+                    gl::TEXTURE_2D,
+                    tex,
+                    0,
+                )
+            }
+        } else {
+            let mut rb = 0;
+            unsafe { self.gl.GenRenderbuffers(1, &mut rb) };
+            dbg!(unsafe { self.gl.GetError() });
+            unsafe { self.gl.BindRenderbuffer(gl::RENDERBUFFER, rb) }
+            dbg!(unsafe { self.gl.GetError() });
+            unsafe { self.gl.EGLImageTargetRenderbufferStorageOES(gl::RENDERBUFFER, image) };
+            dbg!(unsafe { self.gl.GetError() });
+            unsafe {
+                self.gl.FramebufferRenderbuffer(
+                    gl::FRAMEBUFFER,
+                    gl::COLOR_ATTACHMENT0,
+                    gl::RENDERBUFFER,
+                    rb,
+                )
+            }
+        }
+        dbg!(unsafe { self.gl.GetError() });
+        assert_eq!(
+            unsafe { self.gl.CheckFramebufferStatus(gl::FRAMEBUFFER) },
+            gl::FRAMEBUFFER_COMPLETE
+        );
     }
 
     pub fn draw(&self) {
