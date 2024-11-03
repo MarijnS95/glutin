@@ -10,7 +10,6 @@ use raw_window_handle::RawWindowHandle;
 #[cfg(wayland_platform)]
 use wayland_sys::{egl::*, ffi_dispatch};
 
-use crate::api::egl::display::EglDisplay;
 use crate::config::GetGlConfig;
 use crate::display::GetGlDisplay;
 use crate::error::{ErrorKind, Result};
@@ -23,7 +22,7 @@ use crate::surface::{
 
 use super::config::Config;
 use super::context::PossiblyCurrentContext;
-use super::display::Display;
+use super::display::{Display, EglDisplay};
 
 /// Hint for the attribute list size.
 const ATTR_SIZE_HINT: usize = 8;

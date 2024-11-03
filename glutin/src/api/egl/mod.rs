@@ -26,6 +26,7 @@ pub mod config;
 pub mod context;
 pub mod device;
 pub mod display;
+pub mod image;
 pub mod surface;
 
 // WARNING: If this implementation is ever changed to unload or replace the

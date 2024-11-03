@@ -91,7 +91,7 @@ impl Display {
     ///
     /// If `raw_display` is [`Some`], `raw_display` must point to a valid
     /// [`RawDisplayHandle::Drm`]. The provided
-    /// [`raw_display_handle::DrmDisplayHandle.fd`] may be closed after calling
+    /// [`raw_window_handle::DrmDisplayHandle::fd`] may be closed after calling
     /// this function.
     pub unsafe fn with_device(
         device: &Device,

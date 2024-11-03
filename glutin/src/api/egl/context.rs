@@ -201,7 +201,7 @@ impl Display {
 /// A wrapper around `EGLContext` that is known to be not current.
 #[derive(Debug)]
 pub struct NotCurrentContext {
-    inner: ContextInner,
+    pub(crate) inner: ContextInner,
 }
 
 impl NotCurrentContext {
@@ -356,7 +356,7 @@ impl Sealed for PossiblyCurrentContext {}
 pub(crate) struct ContextInner {
     display: Display,
     config: Config,
-    raw: EglContext,
+    pub(crate) raw: EglContext,
     api: egl::types::EGLenum,
 }
 
@@ -487,7 +487,7 @@ impl fmt::Debug for ContextInner {
 }
 
 #[derive(Debug)]
-struct EglContext(EGLContext);
+pub(crate) struct EglContext(EGLContext);
 
 // Impl only `Send` for EglContext.
 unsafe impl Send for EglContext {}
